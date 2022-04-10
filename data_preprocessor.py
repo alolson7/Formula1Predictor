@@ -1,6 +1,36 @@
 # script for data preprocessing
 
 import pandas as pd
+from kaggle.api.kaggle_api_extended import KaggleApi
+import zipfile
+import os
+import glob
+
+
+# downloads most recent data from Vopani's kaggle dataset to ./data/
+def get_kaggle_data():
+    api = KaggleApi()
+    api.authenticate()
+
+    api.dataset_download_files('rohanrao/formula-1-world-championship-1950-2020', path="./data/")
+
+    # unzip
+    with zipfile.ZipFile('./data/formula-1-world-championship-1950-2020.zip', 'r') as zipref:
+        zipref.extractall('./data/')
+
+    # delete zip file
+    os.remove('./data/formula-1-world-championship-1950-2020.zip')
+
+
+# clear ./data/
+def clear_data():
+    files = glob.glob('./data/*')
+
+    for f in files:
+        try:
+            os.remove(f)
+        except OSError as e:
+            print("clear_data error:", f, ":", e.strerror)
 
 
 def preprocess():
@@ -80,7 +110,7 @@ def preprocess():
 
     data['driver_confidence'] = data['driver'].apply(lambda x: driver_confidence_dict[x])
     data['constructor_reliability'] = data['constructor'].apply(lambda x: constructor_relaiblity_dict[x])
-    
+
     # removing retired drivers and constructors
     active_constructors = ['Renault', 'Williams', 'McLaren', 'Ferrari', 'Mercedes',
                            'AlphaTauri', 'Racing Point', 'Alfa Romeo', 'Red Bull',
@@ -94,3 +124,7 @@ def preprocess():
                       'Romain Grosjean', 'Nicholas Latifi']
     data['active_driver'] = data['driver'].apply(lambda x: int(x in active_drivers))
     data['active_constructor'] = data['constructor'].apply(lambda x: int(x in active_constructors))
+
+
+get_kaggle_data()
+# clear_data()
