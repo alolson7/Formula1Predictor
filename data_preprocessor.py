@@ -8,6 +8,8 @@ import glob
 
 
 # downloads most recent data from Vopani's kaggle dataset to ./data/
+# NOTE: if you get the error "OSError: Could not find kaggle.json", add the kaggle.json file to
+# C:Users/(computer username)/.kaggle/ after doing pip install kaggle
 def get_kaggle_data():
     api = KaggleApi()
     api.authenticate()
@@ -124,6 +126,8 @@ def preprocess():
                       'Romain Grosjean', 'Nicholas Latifi']
     data['active_driver'] = data['driver'].apply(lambda x: int(x in active_drivers))
     data['active_constructor'] = data['constructor'].apply(lambda x: int(x in active_constructors))
+    
+    return data
 
 
 get_kaggle_data()
