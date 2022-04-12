@@ -36,6 +36,7 @@ def clear_data():
 
 
 def preprocess():
+    # read csv files
     results = pd.read_csv(r'data\results.csv')
     races = pd.read_csv(r'data\races.csv')
     quali = pd.read_csv(r'data\qualifying.csv')
@@ -43,6 +44,7 @@ def preprocess():
     constructors = pd.read_csv(r'data\constructors.csv')
     circuit = pd.read_csv(r'data\circuits.csv')
 
+    # merge datasets
     df1 = pd.merge(races, results, how='inner', on=['raceId'])
     df2 = pd.merge(df1, quali, how='inner', on=['raceId', 'driverId', 'constructorId'])
     df3 = pd.merge(df2, drivers, how='inner', on=['driverId'])
@@ -50,22 +52,61 @@ def preprocess():
     df5 = pd.merge(df4, circuit, how='inner', on=['circuitId'])
 
     # drop the columns which are not important
-    data = df5.drop(['round', 'circuitId', 'time_x', 'url_x', 'resultId', 'driverId',
-                     'constructorId', 'number_x', 'positionText', 'position_x',
-                     'positionOrder', 'laps', 'time_y', 'rank',
-                     'fastestLapTime', 'fastestLapSpeed', 'qualifyId', 'driverRef', 'number', 'code', 'url_y',
+    data = df5.drop(['round',
+                     'circuitId',
+                     'time_x',
+                     'url_x',
+                     'resultId',
+                     'driverId',
+                     'constructorId',
+                     'number_x',
+                     'positionText',
+                     'position_x',
+                     'positionOrder',
+                     'laps',
+                     'time_y',
+                     'rank',
+                     'fastestLapTime',
+                     'fastestLapSpeed',
+                     'qualifyId',
+                     'driverRef',
+                     'number',
+                     'code',
+                     'url_y',
                      'circuitRef',
-                     'location', 'lat', 'lng', 'alt', 'number_y', 'points', 'constructorRef', 'name_x', 'raceId',
-                     'fastestLap', 'q2', 'q3', 'milliseconds', 'q1'], 1)
+                     'location',
+                     'lat',
+                     'lng',
+                     'alt',
+                     'number_y',
+                     'points',
+                     'constructorRef',
+                     'name_x',
+                     'raceId',
+                     'fastestLap',
+                     'q2',
+                     'q3',
+                     'milliseconds',
+                     'q1'], 1)
 
     # considering data points from 2010
+    # @TODO: investigate if this is necessary
     data = data[data['year'] >= 2010]
 
     # rename the columns
-    data.rename(columns={'name': 'GP_name', 'position_y': 'position', 'grid': 'quali_pos', 'name_y': 'constructor',
-                         'nationality_x': 'driver_nationality', 'nationality_y': 'constructor_nationality'},
+    data.rename(columns={'name': 'GP_name',
+                         'position_y': 'position',
+                         'grid': 'quali_pos',
+                         'name_y': 'constructor',
+                         'nationality_x': 'driver_nationality',
+                         'nationality_y': 'constructor_nationality'},
                 inplace=True)
+
+    # replace forename and surname parameters with one full name parameter
     data['driver'] = data['forename'] + ' ' + data['surname']
+    data.drop(['forename', 'surname'], 1, inplace=True)
+
+    # convert date and dob to datetime
     data['date'] = pd.to_datetime(data['date'])
     data['dob'] = pd.to_datetime(data['dob'])
 
@@ -74,29 +115,33 @@ def preprocess():
     data['age_at_gp_in_days'] = data['age_at_gp_in_days'].apply(lambda x: str(x).split(' ')[0])
 
     # Some of the constructors changed their name over the year so replacing old names with current name
+    # @TODO: seems inefficient to loop iterate through dataset 4 times...
     data['constructor'] = data['constructor'].apply(lambda x: 'Racing Point' if x == 'Force India' else x)
     data['constructor'] = data['constructor'].apply(lambda x: 'Alfa Romeo' if x == 'Sauber' else x)
     data['constructor'] = data['constructor'].apply(lambda x: 'Renault' if x == 'Lotus F1' else x)
     data['constructor'] = data['constructor'].apply(lambda x: 'AlphaTauri' if x == 'Toro Rosso' else x)
 
-    data['driver_nationality'] = data['driver_nationality'].apply(lambda x: str(x)[:3])
-    data['constructor_nationality'] = data['constructor_nationality'].apply(lambda x: str(x)[:3])
+    # adjust some nationality names for Bri, Ame, and Fre
     data['country'] = data['country'].apply(lambda x: 'Bri' if x == 'UK' else x)
     data['country'] = data['country'].apply(lambda x: 'Ame' if x == 'USA' else x)
     data['country'] = data['country'].apply(lambda x: 'Fre' if x == 'Fra' else x)
+    # shorten strings to first 3 letters
     data['country'] = data['country'].apply(lambda x: str(x)[:3])
-    data['driver_home'] = data['driver_nationality'] == data['country']
+    data['driver_nationality'] = data['driver_nationality'].apply(lambda x: str(x)[:3])
+    data['constructor_nationality'] = data['constructor_nationality'].apply(lambda x: str(x)[:3])
+
+    # creating a home game parameter (for each driver/constructor, 1 if racing at home and 0 otherwise)
+    data['driver_home'] = (data['driver_nationality'] == data['country'])
     data['constructor_home'] = data['constructor_nationality'] == data['country']
     data['driver_home'] = data['driver_home'].apply(lambda x: int(x))
     data['constructor_home'] = data['constructor_home'].apply(lambda x: int(x))
 
     # reasons for DNF(did not finish)
+    # @TODO: why user 'in' for driver and 'not in' for constructor?
     data['driver_dnf'] = data['statusId'].apply(
         lambda x: 1 if x in [3, 4, 20, 29, 31, 41, 68, 73, 81, 97, 82, 104, 107, 130, 137] else 0)
     data['constructor_dnf'] = data['statusId'].apply(
         lambda x: 1 if x not in [3, 4, 20, 29, 31, 41, 68, 73, 81, 97, 82, 104, 107, 130, 137, 1] else 0)
-    data.drop(['forename', 'surname'], 1, inplace=True)
-
 
     dnf_by_driver = data.groupby('driver').sum()['driver_dnf']
     driver_race_entered = data.groupby('driver').count()['driver_dnf']
@@ -126,9 +171,10 @@ def preprocess():
                       'Romain Grosjean', 'Nicholas Latifi']
     data['active_driver'] = data['driver'].apply(lambda x: int(x in active_drivers))
     data['active_constructor'] = data['constructor'].apply(lambda x: int(x in active_constructors))
-    
+
     return data
 
 
-get_kaggle_data()
+# get_kaggle_data()
+preprocess()
 # clear_data()
